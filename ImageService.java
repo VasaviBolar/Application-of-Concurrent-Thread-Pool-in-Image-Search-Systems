@@ -1,27 +1,24 @@
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.UUID;
 
 public class ImageService {
 
-    private static final String IMAGE_DIR = "images/";
+    private static final String DIR = "images/";
 
-    public static String saveImage(byte[] data) throws IOException {
+    public static String saveImage(byte[] data) throws Exception {
 
-        File dir = new File(IMAGE_DIR);
-        if (!dir.exists()) {
-            dir.mkdirs(); // create folder if missing
-        }
+        File folder = new File(DIR);
+        if (!folder.exists()) folder.mkdirs();
 
-        String fileName = UUID.randomUUID() + ".jpg";
-        String path = IMAGE_DIR + fileName;
+        String name = UUID.randomUUID() + ".jpg";
+        String path = DIR + name;
 
-        try (FileOutputStream fos = new FileOutputStream(path)) {
-            fos.write(data);
-        }
+        FileOutputStream fos = new FileOutputStream(path);
+        fos.write(data);
+        fos.close();
 
-        System.out.println("Saved image at: " + path);
+        System.out.println("Saved: " + path);
 
         return path;
     }

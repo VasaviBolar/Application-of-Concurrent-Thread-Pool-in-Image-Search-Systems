@@ -2,39 +2,45 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.file.Files;
 
 public class RequestHandler {
 
     public static void handle(Socket socket) {
         try (
-            InputStream input = socket.getInputStream();
-            OutputStream output = socket.getOutputStream();
+                InputStream input = socket.getInputStream();
+                OutputStream output = socket.getOutputStream();
         ) {
 
-            StringBuilder requestBuilder = new StringBuilder();
+            StringBuilder headers = new StringBuilder();
             int prev = 0, curr;
 
-            // Read headers manually
             while ((curr = input.read()) != -1) {
-                requestBuilder.append((char) curr);
+                headers.append((char) curr);
 
                 if (prev == '\r' && curr == '\n') {
-                    int len = requestBuilder.length();
-                    if (len >= 4 &&
-                        requestBuilder.substring(len - 4).equals("\r\n\r\n")) {
+                    int len = headers.length();
+                    if (len >= 4 && headers.substring(len - 4).equals("\r\n\r\n")) {
                         break;
                     }
                 }
                 prev = curr;
             }
 
-            String headers = requestBuilder.toString();
-            System.out.println(headers);
+            String headerStr = headers.toString();
+            System.out.println(headerStr);
 
-            if (headers.startsWith("POST /upload")) {
-                handleUpload(headers, input, output);
-            } else if (headers.startsWith("GET /search")) {
-                handleSearch(headers, output);
+            if (headerStr.startsWith("OPTIONS")) {
+                sendCors(output);
+                return;
+            }
+
+            if (headerStr.startsWith("POST /upload")) {
+                handleUpload(headerStr, input, output);
+            } else if (headerStr.startsWith("GET /search")) {
+                handleSearch(headerStr, output);
+            } else if (headerStr.startsWith("GET /images/")) {
+                serveImage(headerStr, output);
             }
 
         } catch (Exception e) {
@@ -52,20 +58,20 @@ public class RequestHandler {
             }
         }
 
-        byte[] imageBytes = new byte[contentLength];
+        byte[] data = new byte[contentLength];
 
-        int totalRead = 0;
-        while (totalRead < contentLength) {
-            int read = input.read(imageBytes, totalRead, contentLength - totalRead);
-            if (read == -1) break;
-            totalRead += read;
+        int read = 0;
+        while (read < contentLength) {
+            int r = input.read(data, read, contentLength - read);
+            if (r == -1) break;
+            read += r;
         }
 
-        System.out.println("Bytes read: " + totalRead);
+        String filePath = ImageService.saveImage(data);
 
-        String filePath = ImageService.saveImage(imageBytes);
+        // 🔥 FIX WINDOWS PATH
+        String safePath = filePath.replace("\\", "\\\\");
 
-        // 🔥 Send to Python FAISS
         URL url = new URL("http://localhost:5000/store");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
@@ -73,7 +79,7 @@ public class RequestHandler {
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json");
 
-        String json = "{\"image_path\":\"" + filePath + "\"}";
+        String json = "{\"image_path\":\"" + safePath + "\"}";
 
         OutputStream os = conn.getOutputStream();
         os.write(json.getBytes());
@@ -86,7 +92,7 @@ public class RequestHandler {
 
     private static void handleSearch(String headers, OutputStream output) throws Exception {
 
-        String query = "dog"; // default
+        String query = "cat";
 
         if (headers.contains("?q=")) {
             query = headers.split("q=")[1].split(" ")[0];
@@ -105,22 +111,52 @@ public class RequestHandler {
         os.write(json.getBytes());
         os.close();
 
-        BufferedReader br = new BufferedReader(
-                new InputStreamReader(conn.getInputStream()));
-
+        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
         String response = br.readLine();
 
         sendResponse(output, response);
     }
 
-    private static void sendResponse(OutputStream output, String message) throws IOException {
-        String response =
-                "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: application/json\r\n" +
-                "\r\n" +
-                message;
+    private static void serveImage(String headers, OutputStream output) throws Exception {
 
-        output.write(response.getBytes());
-        output.flush();
+        String path = headers.split(" ")[1].substring(1);
+
+        File file = new File(path);
+
+        if (!file.exists()) {
+            sendResponse(output, "Not found");
+            return;
+        }
+
+        byte[] data = Files.readAllBytes(file.toPath());
+
+        String res =
+                "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: image/jpeg\r\n" +
+                "Content-Length: " + data.length + "\r\n" +
+                "Access-Control-Allow-Origin: *\r\n\r\n";
+
+        output.write(res.getBytes());
+        output.write(data);
+    }
+
+    private static void sendCors(OutputStream output) throws IOException {
+        String res =
+                "HTTP/1.1 200 OK\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+                "Access-Control-Allow-Headers: Content-Type\r\n\r\n";
+
+        output.write(res.getBytes());
+    }
+
+    private static void sendResponse(OutputStream output, String msg) throws IOException {
+        String res =
+                "HTTP/1.1 200 OK\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Content-Type: application/json\r\n\r\n" +
+                msg;
+
+        output.write(res.getBytes());
     }
 }

@@ -3,12 +3,12 @@ import java.net.Socket;
 
 public class Server {
 
-    private static final int PORT = 8080;
-    private static ThreadPool pool = new ThreadPool(4);
-
     public static void main(String[] args) {
-        try (ServerSocket server = new ServerSocket(PORT)) {
-            System.out.println("Server running on port " + PORT);
+        try (ServerSocket server = new ServerSocket(8080)) {
+
+            System.out.println("Server running on port 8080");
+
+            ThreadPool pool = new ThreadPool(4);
 
             while (true) {
                 Socket client = server.accept();

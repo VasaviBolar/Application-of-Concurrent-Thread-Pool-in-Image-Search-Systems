@@ -12,4 +12,4 @@ public class DatabaseService {
     public static List<String> getImages() {
         return imagePaths;
     }
-}\
+}

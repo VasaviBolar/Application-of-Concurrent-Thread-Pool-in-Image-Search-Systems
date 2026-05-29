@@ -12,14 +12,14 @@ public class ImageService {
         if (!folder.exists()) folder.mkdirs();
 
         String name = UUID.randomUUID() + ".jpg";
-        String path = DIR + name;
+        File file = new File(DIR + name);
 
-        FileOutputStream fos = new FileOutputStream(path);
+        FileOutputStream fos = new FileOutputStream(file);
         fos.write(data);
         fos.close();
 
-        System.out.println("Saved: " + path);
+        System.out.println("Saved: " + file.getAbsolutePath());
 
-        return path;
+        return file.getAbsolutePath(); // 🔥 absolute path
     }
 }

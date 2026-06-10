@@ -54,7 +54,7 @@ public class RequestHandler {
 
         for (String line : headers.split("\r\n")) {
             if (line.toLowerCase().startsWith("content-length:")) {
-                contentLength = Integer.parseInt(line.split(":")[1].trim());
+              contentLength = Integer.parseInt(line.split(":")[1].trim());
             }
         }
 
@@ -149,6 +149,7 @@ public class RequestHandler {
 
         output.write(res.getBytes());
     }
+    // sendcors is cors preflight request
 
     private static void sendResponse(OutputStream output, String msg) throws IOException {
         String res =
